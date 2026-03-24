@@ -124,3 +124,31 @@ Update pyproject.toml only through uv package manager!
 3. 6 scripts — implement and test individually with `uv run`
 4. `SKILL.md` — references scripts by name
 5. `data-collection.md` agent — references skill
+
+## What was done
+
+All items completed. 19 tests pass (`uv run pytest tests/test_data_collection.py -v`).
+
+### Files created/modified (11 + 1 extra)
+
+| # | File | Status |
+|---|---|---|
+| 1 | `.env_example` | Added `KAGGLE_API_TOKEN`, `KAGGLE_USERNAME`, `HUGGINGFACE_TOKEN` |
+| 2 | `pyproject.toml` | Added deps via `uv add`: kaggle, huggingface_hub, requests, requests-html, python-dotenv, pydantic. Also added `lxml-html-clean` (required by requests-html) and `ruff` as dev dep. |
+| 3 | `.gitignore` | Added `workspace/` (`.env` was already present) |
+| 4 | `src/models.py` | Created `DatasetOption` and `DataContract` Pydantic models |
+| 5 | `search_kaggle.py` | CLI script — searches via `KaggleApi.dataset_list()`. Fixed `totalBytes` → `total_bytes` (actual API attribute). |
+| 6 | `download_kaggle.py` | CLI script — downloads via `KaggleApi.dataset_download_files()`. Added stdout suppression for Kaggle API logging. |
+| 7 | `search_huggingface.py` | CLI script — searches via `HfApi().list_datasets()`. Fixed: removed unsupported `direction` kwarg. |
+| 8 | `download_huggingface.py` | CLI script — downloads via `snapshot_download()` |
+| 9 | `template_scrape_web.py` | Code template — requests-html patterns |
+| 10 | `template_call_api.py` | Code template — requests patterns |
+| 11 | `SKILL.md` | Skill definition with 2 decision points (dataset selection, format confirmation) |
+| 12 | `.opencode/agents/data-collection.md` | Subagent definition (bash:allow, edit:deny) |
+| extra | `tests/test_data_collection.py` | 19 integration tests: Kaggle search (4), Kaggle download (2), HF search (5), HF download (2), web scraping (2), API calls (4). Cleanup fixture removes `test_data-collection-session/` after run. |
+
+### Bugs found and fixed during testing
+
+1. `search_kaggle.py`: `ds.totalBytes` and `ds.fileType` don't exist on `ApiDataset` — changed to `ds.total_bytes`, set format to `None`.
+2. `download_kaggle.py`: Kaggle API prints `Dataset URL:` to stdout, breaking JSON output — wrapped `dataset_download_files()` call with stdout capture.
+3. `search_huggingface.py`: `list_datasets()` doesn't accept `direction` kwarg — removed it.
