@@ -48,6 +48,7 @@ These are code templates, not runnable scripts. The agent adapts and executes it
 
 - **Use the `question` tool to present options and get user input.** Do NOT use bash `echo`/`cat`/`printf` to print options — the user cannot respond to bash output.
 - **Maximum 3 search queries total.** Run 2 queries initially (one per source). Only run a 3rd if results are insufficient.
+- **Always run at least one websearch call** to discover alternative data sources beyond Kaggle and HuggingFace.
 - **After each `question` call, STOP and WAIT** for the user to respond before proceeding.
 
 ## Workflow (follow exactly, in order)
@@ -63,33 +64,49 @@ uv run scripts/search_huggingface.py --query "<contract.topic>" --max-results 10
 ```
 If total relevant results are fewer than 3, try ONE additional broader query. Then STOP searching.
 
-### Step 3: Compile and filter results
-Collect all `DatasetOption` results into a single list. Filter by `format_preference` and `size_preference`. Keep top 5-6 most relevant.
+### Step 3: Websearch for alternative sources
+Run at least one websearch call to find datasets outside Kaggle/HuggingFace:
+```
+websearch(query="<topic> dataset download csv")
+```
+From the results, extract 2-3 relevant data source URLs with their descriptions. Add these to the pool of options alongside Kaggle/HF results.
 
-### Step 4: Call `question` tool to present options
-**Call the `question` tool** (NOT bash) to present found datasets and ask the user which one(s) to download:
+### Step 4: Compile, filter, and order results
+Combine all results (Kaggle + HuggingFace + websearch). Order by relevance to the user's query, regardless of source. Filter by `format_preference` and `size_preference`. Keep top 5-6 most relevant.
+
+### Step 5: Call `question` tool to present options
+**Call the `question` tool** (NOT bash) to present found datasets and ask the user which one(s) to download. Order options by relevance, prefix with source type:
 ```
 question(questions=[{
   "question": "I found these datasets matching your requirements. Which one would you like to download?",
   "header": "Select dataset",
   "options": [
-    {"label": "Option 1 name", "description": "source, size, format"},
-    {"label": "Option 2 name", "description": "source, size, format"},
+    {"label": "Option 1 (web)", "description": "direct download, format, brief description"},
+    {"label": "Option 2 (Kaggle)", "description": "Kaggle, size, brief description"},
+    {"label": "Option 3 (HF)", "description": "HuggingFace, size, brief description"},
     ...
   ]
 }])
 ```
 WAIT for the user response. Do NOT proceed until the user selects an option.
 
-### Step 5: Download selected dataset
-Run the appropriate download script:
+### Step 6: Download selected dataset
+Run the appropriate download script based on the selected source:
+
+**For Kaggle:**
 ```bash
 uv run scripts/download_kaggle.py --dataset-id "<selected_slug>" --output "<session_dir>/collection/data/"
-# or
+```
+
+**For HuggingFace:**
+```bash
 uv run scripts/download_huggingface.py --dataset-id "<selected_id>" --output "<session_dir>/collection/data/"
 ```
 
-### Step 6: Call `question` tool to confirm
+**For web sources:**
+Read `template_scrape_web.py` or `template_call_api.py` as reference patterns. Write a temporary script adapted to the specific URL, execute via `uv run`, and save output to `<session_dir>/collection/data/`.
+
+### Step 7: Call `question` tool to confirm
 **Call the `question` tool** (NOT bash) to confirm the downloaded dataset looks correct and ask about format conversion:
 ```
 question(questions=[{
@@ -104,14 +121,14 @@ question(questions=[{
 ```
 WAIT for the user response before proceeding.
 
-### Step 7: Write report
+### Step 8: Write report
 Write `report.md` in `<session_dir>/collection/` summarizing:
-- Sources searched and number of results per source
+- Sources searched (Kaggle, HuggingFace, websearch) and number of results per source
 - Selected dataset details
 - Downloaded files and their sizes
 - Any issues encountered
 
-### Step 8: Return summary
+### Step 9: Return summary
 Return a text summary to the orchestrator. This is your FINAL action — do not loop back.
 
 ## Environment Requirements
