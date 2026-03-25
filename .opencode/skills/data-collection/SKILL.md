@@ -44,64 +44,75 @@ Both output a JSON object with download status and file paths to stdout.
 
 These are code templates, not runnable scripts. The agent adapts and executes its own versions.
 
-## Workflow
+## IMPORTANT: Tool Usage Rules
 
-1. **Parse contract** — Read the `DataContract` JSON from the session workspace to understand what data the user needs.
+- **Use the `question` tool to present options and get user input.** Do NOT use bash `echo`/`cat`/`printf` to print options — the user cannot respond to bash output.
+- **Maximum 3 search queries total.** Run 2 queries initially (one per source). Only run a 3rd if results are insufficient.
+- **After each `question` call, STOP and WAIT** for the user to respond before proceeding.
 
-2. **Search sources** — Run search scripts for each source in `sources_preference`:
-   ```bash
-   uv run scripts/search_kaggle.py --query "<contract.topic>" --max-results 10
-   uv run scripts/search_huggingface.py --query "<contract.topic>" --max-results 10
-   ```
+## Workflow (follow exactly, in order)
 
-3. **Compile results** — Collect all `DatasetOption` results into a single list. Filter by format if `format_preference` is set.
+### Step 1: Parse contract
+Read the `DataContract` JSON from the session workspace to understand what data the user needs.
 
-4. **DECISION POINT 1: Present options to user**
-   Use the `question` tool to present found datasets and ask the user which one(s) to download:
-   ```
-   question(
-     questions=[{
-       "question": "I found these datasets matching your requirements. Which one would you like to download?",
-       "header": "Select dataset",
-       "options": [
-         {"label": "Option 1 name", "description": "source, size, format"},
-         {"label": "Option 2 name", "description": "source, size, format"},
-         ...
-       ]
-     }]
-   )
-   ```
+### Step 2: Search sources (max 3 queries)
+Run search scripts for each source in `sources_preference`. Use the contract `topic` as the query:
+```bash
+uv run scripts/search_kaggle.py --query "<contract.topic>" --max-results 10
+uv run scripts/search_huggingface.py --query "<contract.topic>" --max-results 10
+```
+If total relevant results are fewer than 3, try ONE additional broader query. Then STOP searching.
 
-5. **Download selected dataset** — Run the appropriate download script:
-   ```bash
-   uv run scripts/download_kaggle.py --dataset-id "<selected_slug>" --output "<session_dir>/collection/data/"
-   # or
-   uv run scripts/download_huggingface.py --dataset-id "<selected_id>" --output "<session_dir>/collection/data/"
-   ```
+### Step 3: Compile and filter results
+Collect all `DatasetOption` results into a single list. Filter by `format_preference` and `size_preference`. Keep top 5-6 most relevant.
 
-6. **DECISION POINT 2: Confirm dataset**
-   Use the `question` tool to confirm the downloaded dataset looks correct and ask about format conversion:
-   ```
-   question(
-     questions=[{
-       "question": "Dataset downloaded to <path>. Would you like to convert the format?",
-       "header": "Format conversion",
-       "options": [
-         {"label": "Keep as-is", "description": "No conversion needed"},
-         {"label": "Convert to CSV", "description": "Convert all files to CSV format"},
-         {"label": "Convert to JSON", "description": "Convert all files to JSON format"}
-       ]
-     }]
-   )
-   ```
+### Step 4: Call `question` tool to present options
+**Call the `question` tool** (NOT bash) to present found datasets and ask the user which one(s) to download:
+```
+question(questions=[{
+  "question": "I found these datasets matching your requirements. Which one would you like to download?",
+  "header": "Select dataset",
+  "options": [
+    {"label": "Option 1 name", "description": "source, size, format"},
+    {"label": "Option 2 name", "description": "source, size, format"},
+    ...
+  ]
+}])
+```
+WAIT for the user response. Do NOT proceed until the user selects an option.
 
-7. **Write report** — Write `report.md` in `<session_dir>/collection/` summarizing:
-   - Sources searched and number of results per source
-   - Selected dataset details
-   - Downloaded files and their sizes
-   - Any issues encountered
+### Step 5: Download selected dataset
+Run the appropriate download script:
+```bash
+uv run scripts/download_kaggle.py --dataset-id "<selected_slug>" --output "<session_dir>/collection/data/"
+# or
+uv run scripts/download_huggingface.py --dataset-id "<selected_id>" --output "<session_dir>/collection/data/"
+```
 
-8. **Return summary** — Return a text summary to the orchestrator.
+### Step 6: Call `question` tool to confirm
+**Call the `question` tool** (NOT bash) to confirm the downloaded dataset looks correct and ask about format conversion:
+```
+question(questions=[{
+  "question": "Dataset downloaded to <path>. Would you like to convert the format?",
+  "header": "Format conversion",
+  "options": [
+    {"label": "Keep as-is", "description": "No conversion needed"},
+    {"label": "Convert to CSV", "description": "Convert all files to CSV format"},
+    {"label": "Convert to JSON", "description": "Convert all files to JSON format"}
+  ]
+}])
+```
+WAIT for the user response before proceeding.
+
+### Step 7: Write report
+Write `report.md` in `<session_dir>/collection/` summarizing:
+- Sources searched and number of results per source
+- Selected dataset details
+- Downloaded files and their sizes
+- Any issues encountered
+
+### Step 8: Return summary
+Return a text summary to the orchestrator. This is your FINAL action — do not loop back.
 
 ## Environment Requirements
 
