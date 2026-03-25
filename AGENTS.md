@@ -9,6 +9,7 @@ A pipeline system for data exploration, analysis, and annotation. Each pipeline 
 | `orchestrator` | primary | Main entry point — builds contract, runs pipeline stages |
 | `data-collection` | subagent | Searches and downloads datasets from Kaggle, HuggingFace, and web |
 | `data-quality` | subagent | Profiles data, detects issues, applies cleaning |
+| `annotation` | subagent | Samples and annotates data, exports LabelStudio JSON with pre-annotations |
 
 ## Directory Conventions
 
@@ -30,7 +31,7 @@ workspace/session-YYYY-MM-DDTHH:MM:SS/
 ├── quality/
 │   ├── data/
 │   └── report.md
-└── annotation/          (future)
+└── annotation/
     ├── labels.json
     └── report.md
 ```
@@ -60,5 +61,6 @@ Use `@` mentions in prompts to invoke stage agents:
 
 - `@data-collection` — Search and download datasets
 - `@data-quality` — Profile and clean data
+- `@annotation` — Sample data and produce LabelStudio-compatible labeled output
 
 Pass the session directory path in the prompt so the subagent knows where to find the contract and write artifacts.

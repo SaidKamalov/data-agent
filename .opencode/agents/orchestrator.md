@@ -54,7 +54,7 @@ Use the `question` tool to gather details. Cover at least these areas:
 - **Format preference** — CSV, JSON, Parquet, or any?
 - **Size preference** — Small (<1k rows), medium, large, or any?
 - **Columns of interest** — What specific attributes matter?
-- **Annotation needs** — Classification, NER, or none?
+- **Annotation needs** — Classification, NER, or none? If annotation is needed, what label categories?
 
 Ask only what is not already clear from the user's message.
 
@@ -62,10 +62,10 @@ Ask only what is not already clear from the user's message.
 
 ```bash
 SESSION_DIR="workspace/session-$(date -u +%Y-%m-%dT%H:%M:%S)"
-mkdir -p "$SESSION_DIR/collection/data" "$SESSION_DIR/quality/data"
+mkdir -p "$SESSION_DIR/collection/data" "$SESSION_DIR/quality/data" "$SESSION_DIR/annotation"
 ```
 
-Only `collection/data/` and `quality/data/` directories are needed at start. Other files (`contract.json`, `report.md`) are written by agents as they run.
+Only `collection/data/`, `quality/data/`, and `annotation/` directories are needed at start. Other files (`contract.json`, `report.md`) are written by agents as they run.
 
 ### 4. Write contract.json
 
@@ -79,7 +79,11 @@ Pass the session directory path in the prompt. Wait for the agent to complete. T
 
 Pass the session directory path and the path to the collected data. Wait for the agent to complete. The agent will profile the data, identify issues, consult the user on cleaning strategies, and produce cleaned data and a report.
 
-### 7. Present results
+### 7. Invoke @annotation
+
+If `annotation_task` in the contract is not `none`, invoke the annotation agent. Pass the session directory path and the list of cleaned dataset file paths from the quality stage. The agent will sample data, label samples, export LabelStudio JSON, and produce a report.
+
+### 8. Present results
 
 Summarize what was done and list all artifact paths:
 
@@ -88,10 +92,13 @@ Summarize what was done and list all artifact paths:
 - Collection report: `workspace/session-.../collection/report.md`
 - Cleaned data: `workspace/session-.../quality/data/`
 - Quality report: `workspace/session-.../quality/report.md`
+- Annotations: `workspace/session-.../annotation/` (if annotation was requested)
+- Annotation report: `workspace/session-.../annotation/report.md`
 
 ## Key Design Decisions
 
-- **MVP scope**: Only collection and quality stages. Annotation is future work.
-- **Subagent invocation**: Use `@data-collection` and `@data-quality` mentions. Opencode resolves them by matching agent descriptions.
+- **Full pipeline**: Collection, quality, and annotation stages. Annotation is invoked only when `annotation_task` is not `none`.
+- **Subagent invocation**: Use `@data-collection`, `@data-quality`, and `@annotation` mentions. Opencode resolves them by matching agent descriptions.
 - **Session dir in prompt**: Subagents receive the session directory path and read `contract.json` from it to know what to do.
 - **Sequential execution**: Each stage must complete before the next begins, so artifacts are ready for downstream agents.
+- **Dataset paths to annotation**: Pass the list of cleaned dataset file paths from the quality stage output directory.

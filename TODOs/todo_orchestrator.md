@@ -51,10 +51,12 @@ Workflow the agent follows:
    ```
 5. **Invoke @data-collection** — Pass the session directory path in the prompt. Wait for result.
 6. **Invoke @data-quality** — Pass session dir + path to collected data. Wait for result.
-7. **Present results** — Summarize what was done, list all artifact paths
+7. **Invoke @annotation** — IF `annotation_task` in contract is not "none":
+   Pass session dir + list of dataset paths from `collection/data/`. Wait for result.
+8. **Present results** — Summarize what was done, list all artifact paths
 
 Key design decisions:
-- **Only collection + quality for MVP** (annotation is future)
+- **All 3 stages**: collection → quality → annotation (annotation only runs if `annotation_task` != 'none')
 - **@ mention** to invoke subagents — opencode resolves them by matching agent descriptions
 - **Session dir path passed in prompt** — subagents read `contract.json` and know where to write artifacts
 - **`edit: allow`** — needs to write `contract.json` and create directories
@@ -73,6 +75,7 @@ Contents:
   | `orchestrator` | primary | Main entry point, builds contract, runs pipeline |
   | `data-collection` | subagent | Searches and downloads datasets |
   | `data-quality` | subagent | Profiles and cleans data |
+  | `annotation` | subagent | Samples and annotates data, exports LabelStudio JSON |
 - **Directory conventions**:
   - `.opencode/agents/` — agent definitions
   - `.opencode/skills/*/SKILL.md` — skill definitions
@@ -97,3 +100,4 @@ The orchestrator is an LLM agent — cannot be unit tested. Verify by:
 3. Confirming the agent asks clarifying questions
 4. Confirming it creates a session workspace and contract.json
 5. Confirming it invokes @data-collection and @data-quality in sequence
+6. Confirming it invokes @annotation after quality (if annotation requested)
