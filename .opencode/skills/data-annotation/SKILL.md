@@ -1,13 +1,13 @@
 ---
 name: data-annotation
-description: Sample data and annotate it, export LabelStudio JSON with pre-annotations
+description: Sample data and classify text, export LabelStudio JSON with pre-annotations
 metadata:
   pipeline-stage: annotation
 ---
 
 # Data Annotation Skill
 
-You are a data annotator. Your job is to sample data from cleaned datasets, label each sample directly using your reasoning, consult the user on ambiguous cases, export LabelStudio-compatible JSON with pre-annotations, and produce a report with label distribution and agreement statistics.
+You are a text classification annotator. Your job is to sample text data from cleaned datasets, classify each sample by reading the text and reasoning about the correct label, consult the user on ambiguous cases, export LabelStudio-compatible JSON with pre-annotations, and produce a report with label distribution and agreement statistics.
 
 ## IMPORTANT: Tool Usage Rules
 
@@ -29,21 +29,22 @@ All templates are in `.opencode/skills/data-annotation/scripts/`. These are **re
 You label samples directly — **you ARE the annotator**.
 
 For each row in the sample:
-1. **Read the row data** — understand what each field represents
+1. **Read the text** from the `text_column` field (from the contract)
 2. **Reason about the correct label** based on `annotation_labels` from the contract
 3. **Record your label and confidence** (0–1 scale)
 4. **If confidence < 0.7**, flag the sample for user review via the `question` tool
 
-For classification tasks, present the row content and ask the user to choose from the label categories when uncertain.
+For text classification, present the text content and ask the user to choose from the label categories when uncertain.
 
 Example decision during labeling:
 ```
 question(questions=[{
-    "question": "I'm uncertain about this review: 'The product arrived on time but the quality was mediocre at best. Would not buy again.' Is this fraudulent or legitimate?",
+    "question": "I'm uncertain about this review: 'The product arrived on time but the quality was mediocre at best. Would not buy again.' Is this positive, negative, or neutral?",
     "header": "Label selection",
     "options": [
-        {"label": "Fraudulent", "description": "Review is fake, incentivized, or deceptive"},
-        {"label": "Legitimate", "description": "Review is genuine but negative"}
+        {"label": "Positive", "description": "Overall positive sentiment"},
+        {"label": "Negative", "description": "Overall negative sentiment"},
+        {"label": "Neutral", "description": "Mixed or neutral sentiment"}
     ]
 }])
 ```
@@ -53,8 +54,8 @@ question(questions=[{
 ### 1. Load skill and read contract
 
 Read the `contract.json` from the session directory to get:
-- `annotation_task` — type of annotation (classification, ner, regression, none)
-- `annotation_labels` — list of valid label categories
+- `annotation_task` — type of annotation (currently only `classification` is supported)
+- `annotation_labels` — list of valid label categories for classification
 
 If `annotation_task` is `none`, skip annotation and return immediately.
 
@@ -66,7 +67,7 @@ The orchestrator passes a list of dataset file paths. Process each dataset separ
 
 #### 3a. Read and inspect the dataset
 
-Load the dataset using pandas. Check shape, columns, and whether it has an existing label column.
+Load the dataset using pandas. Check shape, columns, and whether it has an existing label column. Verify the text column (from contract `text_column`) exists and contains readable text.
 
 #### 3b. DECISION POINT 1 — Ask user for sample size
 
@@ -183,7 +184,7 @@ When multiple datasets are passed:
 
 ## LabelStudio JSON Format
 
-Basic structure for classification pre-annotations:
+Basic structure for text classification pre-annotations:
 
 ```json
 [{
@@ -194,7 +195,7 @@ Basic structure for classification pre-annotations:
   "predictions": [{
     "result": [{
       "from_name": "label_class",
-      "to_name": "text",
+      "to_name": "review_text",
       "type": "choices",
       "value": {
         "choices": ["Positive"]
@@ -209,6 +210,7 @@ Key fields:
 - `data`: contains all original fields from the dataset row
 - `predictions`: list of model predictions (pre-annotations)
 - Each prediction has `result` array with `from_name`, `to_name`, `type`, `value`
+- `to_name`: should match the contract's `text_column` value
 - `score`: confidence score (0–1) for active learning sampling
 
 For full format reference, see: https://labelstud.io/guide/tasks#Basic-Label-Studio-JSON-format

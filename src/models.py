@@ -16,7 +16,10 @@ class DatasetOption(BaseModel):
 
 
 class DataContract(BaseModel):
-    """Formalizes the user's data requirements for the pipeline."""
+    """Formalizes the user's data requirements for the text classification pipeline.
+
+    Currently only 'classification' is supported as annotation_task.
+    """
 
     topic: str
     domain: str
@@ -24,7 +27,8 @@ class DataContract(BaseModel):
     sources_preference: list[str]
     format_preference: str
     size_preference: str
+    text_column: str
     columns_of_interest: list[str]
     quality_requirements: str
-    annotation_task: str
+    annotation_task: str = "classification"
     annotation_labels: list[str]

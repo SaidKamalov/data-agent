@@ -11,3 +11,4 @@ wheels/
 
 .env
 workspace/
+tests/test_data-collection-session

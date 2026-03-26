@@ -1,15 +1,15 @@
 # DataAgent
 
-A pipeline system for data exploration, analysis, and annotation. Each pipeline run is orchestrated by a primary agent that clarifies user intent, builds a JSON contract, and invokes specialized stage agents sequentially.
+A pipeline system for text data collection, quality analysis, and classification annotation. Each pipeline run is orchestrated by a primary agent that clarifies user intent, builds a JSON contract, and invokes specialized stage agents sequentially.
 
 ## Available Agents
 
 | Agent | Mode | Purpose |
 |---|---|---|
 | `orchestrator` | primary | Main entry point — builds contract, runs pipeline stages |
-| `data-collection` | subagent | Searches and downloads datasets from Kaggle, HuggingFace, and web |
-| `data-quality` | subagent | Profiles data, detects issues, applies cleaning |
-| `annotation` | subagent | Samples and annotates data, exports LabelStudio JSON with pre-annotations |
+| `data-collection` | subagent | Searches and downloads text classification datasets from Kaggle, HuggingFace, and web |
+| `data-quality` | subagent | Profiles text data quality, detects issues, applies cleaning |
+| `annotation` | subagent | Samples and classifies text data, exports LabelStudio JSON with pre-annotations |
 
 ## Directory Conventions
 
@@ -48,9 +48,10 @@ The orchestrator writes a `contract.json` in the session directory:
   "sources_preference": ["kaggle", "huggingface", "web"],
   "format_preference": "csv|json|parquet|any",
   "size_preference": "small|medium|large|any",
-  "columns_of_interest": ["list of columns the user cares about"],
+  "text_column": "string — name of the text column to classify",
+  "columns_of_interest": ["list of other columns the user cares about"],
   "quality_requirements": "string — what quality means for this use case",
-  "annotation_task": "classification|ner|regression|none",
+  "annotation_task": "classification",
   "annotation_labels": ["list of label categories if known"]
 }
 ```

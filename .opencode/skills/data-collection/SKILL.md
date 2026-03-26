@@ -1,13 +1,13 @@
 ---
 name: data-collection
-description: Search and download datasets from Kaggle, HuggingFace, and web sources
+description: Search and download text classification datasets from Kaggle, HuggingFace, and web sources
 metadata:
   pipeline-stage: collection
 ---
 
 # Data Collection Skill
 
-Search and download datasets from Kaggle, HuggingFace, and web sources.
+Search and download text classification datasets from Kaggle, HuggingFace, and web sources.
 
 ## Available Scripts
 
@@ -57,10 +57,10 @@ These are code templates, not runnable scripts. The agent adapts and executes it
 Read the `DataContract` JSON from the session workspace to understand what data the user needs.
 
 ### Step 2: Search sources (max 3 queries)
-Run search scripts for each source in `sources_preference`. Use the contract `topic` as the query:
+Run search scripts for each source in `sources_preference`. Use the contract `topic` as the query. Append "text classification" or "sentiment" to improve relevance for text tasks:
 ```bash
-uv run scripts/search_kaggle.py --query "<contract.topic>" --max-results 10
-uv run scripts/search_huggingface.py --query "<contract.topic>" --max-results 10
+uv run scripts/search_kaggle.py --query "<contract.topic> text classification dataset" --max-results 10
+uv run scripts/search_huggingface.py --query "<contract.topic> classification" --max-results 10
 ```
 If total relevant results are fewer than 3, try ONE additional broader query. Then STOP searching.
 
@@ -72,7 +72,7 @@ websearch(query="<topic> dataset download csv")
 From the results, extract 2-3 relevant data source URLs with their descriptions. Add these to the pool of options alongside Kaggle/HF results.
 
 ### Step 4: Compile, filter, and order results
-Combine all results (Kaggle + HuggingFace + websearch). Order by relevance to the user's query, regardless of source. Filter by `format_preference` and `size_preference`. Keep top 5-6 most relevant.
+Combine all results (Kaggle + HuggingFace + websearch). Order by relevance to the user's query, regardless of source. Filter by `format_preference` and `size_preference`. Prefer datasets that mention having a clear text column and label/class column in their description. Keep top 5-6 most relevant.
 
 ### Step 5: Call `question` tool to present options
 **Call the `question` tool** (NOT bash) to present found datasets and ask the user which one(s) to download. Order options by relevance, prefix with source type:

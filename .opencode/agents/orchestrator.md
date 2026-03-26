@@ -33,9 +33,10 @@ You must produce a `contract.json` matching this structure:
   "sources_preference": ["kaggle", "huggingface", "web"],
   "format_preference": "csv|json|parquet|any",
   "size_preference": "small|medium|large|any",
-  "columns_of_interest": ["list of columns the user cares about"],
+  "text_column": "string — name of the text column to classify",
+  "columns_of_interest": ["list of other columns the user cares about"],
   "quality_requirements": "string — what quality means for this use case",
-  "annotation_task": "classification|ner|regression|none",
+  "annotation_task": "classification",
   "annotation_labels": ["list of label categories if known"]
 }
 ```
@@ -50,12 +51,13 @@ Parse the user's initial message to identify what data they need.
 
 Use the `question` tool to gather details. Cover at least these areas:
 
-- **Domain/field** — What industry or area? (e.g., finance, healthcare, climate)
+- **Domain/field** — What industry or area? (e.g., finance, healthcare, e-commerce)
+- **Text column** — What is the name of the text column to classify? (e.g., 'review_text', 'tweet', 'article_body')
+- **Classification categories** — What label categories are you targeting? (e.g., sentiment: positive/negative/neutral, topic: politics/sports/tech)
 - **Timeframe** — How recent should the data be?
 - **Format preference** — CSV, JSON, Parquet, or any?
 - **Size preference** — Small (<1k rows), medium, large, or any?
-- **Columns of interest** — What specific attributes matter?
-- **Annotation needs** — Classification, NER, or none? If annotation is needed, what label categories?
+- **Columns of interest** — What other columns matter besides the text column?
 
 Ask only what is not already clear from the user's message.
 
@@ -78,8 +80,8 @@ Launch the data-collection subagent using the `task()` tool. Do NOT use the `ski
 
 ```
 task(
-  description="Search and download datasets for: <contract.topic>",
-  prompt="You are the data-collection agent. Session directory: <SESSION_DIR>. Read contract.json from there, then follow your instructions to search sources, present options to the user, download the selected dataset, and write a collection report.",
+  description="Search and download text classification datasets for: <contract.topic>",
+  prompt="You are the data-collection agent. Session directory: <SESSION_DIR>. Read contract.json from there, then follow your instructions to search sources, present options to the user, download the selected dataset, and write a collection report. Prioritize datasets that have a clear text column and label column for text classification.",
   subagent_type="data-collection"
 )
 ```
@@ -99,8 +101,8 @@ Launch the data-quality subagent using the `task()` tool.
 
 ```
 task(
-  description="Profile and clean data for: <contract.topic>",
-  prompt="You are the data-quality agent. Session directory: <SESSION_DIR>. Read contract.json and profile the data in collection/data/. Detect issues, consult the user on cleaning, apply cleaning, and write a quality report.",
+  description="Profile and clean text data for: <contract.topic>",
+  prompt="You are the data-quality agent. Session directory: <SESSION_DIR>. Read contract.json (note the text_column field) and profile the data in collection/data/. Check text-specific issues: empty/short texts, encoding problems, class imbalance, text length distributions. Detect issues, consult the user on cleaning, apply cleaning, and write a quality report.",
   subagent_type="data-quality"
 )
 ```
@@ -128,8 +130,8 @@ Launch the annotation subagent using the `task()` tool, passing the explicit fil
 
 ```
 task(
-  description="Sample and annotate data for: <contract.topic>",
-  prompt="You are the annotation agent. Session directory: <SESSION_DIR>. Read contract.json for annotation_task and annotation_labels. Cleaned data files to annotate: <SESSION_DIR>/quality/data/file1.csv, <SESSION_DIR>/quality/data/file2.csv. For each file: sample, label, export LabelStudio JSON, write report.",
+  description="Sample and classify text data for: <contract.topic>",
+  prompt="You are the annotation agent. Session directory: <SESSION_DIR>. Read contract.json for text_column, annotation_task, and annotation_labels. Cleaned data files to annotate: <SESSION_DIR>/quality/data/file1.csv, <SESSION_DIR>/quality/data/file2.csv. For each file: sample the data, classify each text row into the label categories, export LabelStudio JSON, write report.",
   subagent_type="annotation"
 )
 ```

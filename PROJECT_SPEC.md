@@ -2,15 +2,15 @@
 
 ## Overview
 
-An agent system for data exploration, analysis, and annotation, built on top of the opencode agent framework. The system implements a 5-stage pipeline where each stage is handled by a dedicated subagent with specialized skills and helper scripts. Human-in-the-loop is achieved via the `question` tool within skill definitions.
+An agent system for text data collection, quality analysis, and classification annotation, built on top of the opencode agent framework. The system implements a 3-stage pipeline focused on text classification tasks (narrative classification, topic classification, sentiment analysis, and similar). Each stage is handled by a dedicated subagent with specialized skills and helper scripts. Human-in-the-loop is achieved via the `question` tool within skill definitions.
 
 ## Pipeline Stages
 
-1. **Data Collection** — Search and download datasets from Kaggle, HuggingFace, and web sources
-2. **Data Quality** — Profile data, detect issues (missing values, outliers, duplicates, bias), apply fixes
-3. **Annotation** — Sample data and produce LabelStudio-compatible labeled output
+1. **Data Collection** — Search and download text classification datasets from Kaggle, HuggingFace, and web sources
+2. **Data Quality** — Profile text-related quality issues (encoding, empty texts, class imbalance, text length), apply fixes
+3. **Annotation** — Sample text data and classify it with LabelStudio-compatible labeled output
 4. _(Reserved for future stage)_
-5. _(Reserved for future stage)_
+5. _(Reserved for future stage — outside current text classification scope)_
 
 ## Architecture
 
@@ -19,9 +19,9 @@ An agent system for data exploration, analysis, and annotation, built on top of 
 | Agent | Mode | Purpose |
 |---|---|---|
 | `orchestrator` | primary | Takes user request, asks clarifying questions, builds JSON contract, sequentially invokes stage agents |
-| `data-collection` | subagent | Searches configured sources, presents options, downloads dataset |
-| `data-quality` | subagent | Profiles data quality, detects issues, applies user-approved cleaning |
-| `annotation` | subagent | Samples data, applies labeling, exports LabelStudio JSON |
+| `data-collection` | subagent | Searches configured sources for text classification datasets, presents options, downloads dataset |
+| `data-quality` | subagent | Profiles text data quality, detects issues, applies user-approved cleaning |
+| `annotation` | subagent | Samples text data, applies classification labels, exports LabelStudio JSON |
 
 ### Communication
 
@@ -42,9 +42,10 @@ The orchestrator formalizes user requests into this JSON object:
   "sources_preference": ["kaggle", "huggingface", "web"],
   "format_preference": "csv|json|parquet|any",
   "size_preference": "small|medium|large|any",
-  "columns_of_interest": ["list of columns the user cares about"],
+  "text_column": "string — name of the text column to classify",
+  "columns_of_interest": ["list of other columns the user cares about"],
   "quality_requirements": "string — what quality means for this use case",
-  "annotation_task": "classification|ner|regression|none",
+  "annotation_task": "classification",
   "annotation_labels": ["list of label categories if known"]
 }
 ```
@@ -142,38 +143,39 @@ dependencies = [
 ## End-to-End Flow
 
 ```
-User: "I need data about European startup funding from the last 3 years"
+User: "I need data for classifying product reviews as positive, negative, or neutral"
 
 Orchestrator:
-  → Creates workspace/session-2026-03-24T23:00:00/
+  → Creates workspace/session-2026-03-25T10:00:00/
+  → "What text column should contain the review text? (e.g., 'review_text')"
   → "What format do you prefer? CSV, JSON, or any?"
-  → "What specific columns interest you? (amount, country, sector, date...)"
   → "How large a dataset? Small (<1k rows), medium, or large?"
-  → Writes contract.json
+  → Writes contract.json with text_column="review_text", annotation_labels=["positive", "negative", "neutral"]
 
   → Invokes @data-collection:
-    → Searches Kaggle: finds 3 datasets
-    → Searches HuggingFace: finds 1 dataset
-    → Scrapes Crunchbase: finds structured table
-    → "Which source do you prefer?" → User picks Kaggle #2
+    → Searches Kaggle: finds "Amazon Product Reviews" and "Yelp Reviews Dataset"
+    → Searches HuggingFace: finds "imdb-reviews" and "amazon_polarity"
+    → Websearch: finds a public review API
+    → "Which dataset?" → User picks Kaggle "Amazon Product Reviews"
     → Downloads, writes report.md, returns summary
 
   → Invokes @data-quality:
-    → Profiles: 15% missing in 'funding_amount', 3% outliers, 12 duplicate rows
-    → "Missing values: drop rows, or impute with median?"
-    → "Outliers: clip to IQR bounds, or remove?"
-    → User chooses: median imputation, clip outliers
+    → Checks text column: 2% empty texts, 5% under 5 words
+    → Class distribution: 55% positive, 30% negative, 15% neutral (imbalanced)
+    → Encoding: 0.1% rows with mojibake characters
+    → "Filter rows with empty text?" → Yes
+    → "Address class imbalance?" → Keep as-is, use stratified sampling
     → Cleans, writes report.md, returns summary
 
   → Invokes @annotation:
     → "How many samples to label? Sampling strategy?"
-    → "Label categories: [seed, series-a, series-b, series-c+]?"
-    → Samples 200 rows, applies keyword-based labeling
+    → "Label categories: [positive, negative, neutral]?"
+    → Samples 200 rows, classifies each review by reading the text
     → Exports LabelStudio JSON, writes report.md, returns summary
 
   → Presents to user:
     "Pipeline complete. Artifacts:
-     - Dataset: workspace/session-.../collection/data/dataset.csv
+     - Dataset: workspace/session-.../collection/data/amazon_reviews.csv
      - Quality report: workspace/session-.../quality/report.md
      - Cleaned data: workspace/session-.../quality/data/cleaned.csv
      - Labels: workspace/session-.../annotation/labels.json
