@@ -32,3 +32,5 @@ class DataContract(BaseModel):
     quality_requirements: str
     annotation_task: str = "classification"
     annotation_labels: list[str]
+    al_strategy: str = "entropy"  # entropy | margin | random
+    al_val_split: float = 0.2

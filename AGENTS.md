@@ -1,6 +1,6 @@
 # DataAgent
 
-A pipeline system for text data collection, quality analysis, and classification annotation. Each pipeline run is orchestrated by a primary agent that clarifies user intent, builds a JSON contract, and invokes specialized stage agents sequentially.
+A pipeline system for text data collection, quality analysis, classification annotation, and active learning. Each pipeline run is orchestrated by a primary agent that clarifies user intent, builds a JSON contract, and invokes specialized stage agents sequentially.
 
 ## Available Agents
 
@@ -10,6 +10,7 @@ A pipeline system for text data collection, quality analysis, and classification
 | `data-collection` | subagent | Searches and downloads text classification datasets from Kaggle, HuggingFace, and web |
 | `data-quality` | subagent | Profiles text data quality, detects issues, applies cleaning |
 | `annotation` | subagent | Samples and classifies text data, exports LabelStudio JSON with pre-annotations |
+| `active-learning` | subagent | Trains TF-IDF + LogReg on labeled samples, iteratively selects uncertain texts for annotation |
 
 ## Directory Conventions
 
@@ -31,8 +32,14 @@ workspace/session-YYYY-MM-DDTHH:MM:SS/
 ├── quality/
 │   ├── data/
 │   └── report.md
-└── annotation/
-    ├── labels.json
+├── annotation/
+│   ├── labels.json
+│   └── report.md
+└── active-learning/
+    ├── selected_samples.csv
+    ├── learning_curve.csv
+    ├── model_metrics.json
+    ├── learning_curve.png
     └── report.md
 ```
 
@@ -52,7 +59,9 @@ The orchestrator writes a `contract.json` in the session directory:
   "columns_of_interest": ["list of other columns the user cares about"],
   "quality_requirements": "string — what quality means for this use case",
   "annotation_task": "classification",
-  "annotation_labels": ["list of label categories if known"]
+  "annotation_labels": ["list of label categories if known"],
+  "al_strategy": "entropy",
+  "al_val_split": 0.2
 }
 ```
 
@@ -84,13 +93,25 @@ task(
 
 After this stage completes, the orchestrator must list files in `quality/data/` to discover the cleaned dataset paths before invoking annotation.
 
-### annotation (only if annotation_task ≠ "none")
+### annotation
 
 ```
 task(
-  description="Sample and annotate data",
-  prompt="Session directory: workspace/session-YYYY-MM-DDTHH:MM:SS/. Read contract.json for annotation_task and annotation_labels. Cleaned data files to annotate: workspace/session-.../quality/data/cleaned.csv. For each file: sample, label, export LabelStudio JSON, write report.",
+  description="Sample and classify text data",
+  prompt="Session directory: workspace/session-YYYY-MM-DDTHH:MM:SS/. Read contract.json for text_column, annotation_task, and annotation_labels. Cleaned data files to annotate: workspace/session-.../quality/data/cleaned.csv. For each file: sample, label, export LabelStudio JSON, write report.",
   subagent_type="annotation"
+)
+```
+
+After this stage completes, the orchestrator must list files in `annotation/` to discover the labeled dataset paths before invoking active-learning.
+
+### active-learning
+
+```
+task(
+  description="Active learning simulation",
+  prompt="Session directory: workspace/session-YYYY-MM-DDTHH:MM:SS/. Read contract.json for text_column, annotation_labels, al_strategy, al_val_split. Labeled data: workspace/session-.../annotation/labeled.csv. Full dataset: workspace/session-.../quality/data/cleaned.csv. Run active learning simulation, output to workspace/session-.../active-learning/.",
+  subagent_type="active-learning"
 )
 ```
 
@@ -99,6 +120,7 @@ task(
 2. Create session workspace
 3. Write contract.json
 4. Discover cleaned data files after quality stage (via `ls`)
-5. Delegate each stage to its subagent via `task()`, passing explicit file paths
-6. Verify each stage produced expected output before proceeding
-7. Present final results
+5. Discover labeled data files after annotation stage (via `ls`)
+6. Delegate each stage to its subagent via `task()`, passing explicit file paths
+7. Verify each stage produced expected output before proceeding
+8. Present final results

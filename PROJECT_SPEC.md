@@ -2,19 +2,19 @@
 
 ## Overview
 
-An agent system for text data collection, quality analysis, and classification annotation, built on top of the opencode agent framework. The system implements a 3-stage pipeline focused on text classification tasks (narrative classification, topic classification, sentiment analysis, and similar). Each stage is handled by a dedicated subagent with specialized skills and helper scripts. Human-in-the-loop is achieved via the `question` tool within skill definitions.
+An agent system for text data collection, quality analysis, classification annotation, and active learning, built on top of the opencode agent framework. The system implements a 4-stage pipeline focused on text classification tasks (narrative classification, topic classification, sentiment analysis, and similar). Each stage is handled by a dedicated subagent with specialized skills and helper scripts. Human-in-the-loop is achieved via the `question` tool within skill definitions.
 
 ## Pipeline Stages
 
 1. **Data Collection** — Search and download text classification datasets from Kaggle, HuggingFace, and web sources
 2. **Data Quality** — Profile text-related quality issues (encoding, empty texts, class imbalance, text length), apply fixes
 3. **Annotation** — Sample text data and classify it with LabelStudio-compatible labeled output
-4. _(Reserved for future stage)_
+4. **Active Learning** — Train TF-IDF + LogReg on labeled samples, iteratively select uncertain unlabeled texts, simulate labeling, track performance, compare baseline vs AL
 5. _(Reserved for future stage — outside current text classification scope)_
 
 ## Architecture
 
-### Agents (4 defined + 1 placeholder)
+### Agents (5 defined)
 
 | Agent | Mode | Purpose |
 |---|---|---|
@@ -22,6 +22,7 @@ An agent system for text data collection, quality analysis, and classification a
 | `data-collection` | subagent | Searches configured sources for text classification datasets, presents options, downloads dataset |
 | `data-quality` | subagent | Profiles text data quality, detects issues, applies user-approved cleaning |
 | `annotation` | subagent | Samples text data, applies classification labels, exports LabelStudio JSON |
+| `active-learning` | subagent | Trains TF-IDF + LogReg on labeled samples, iteratively selects uncertain texts for annotation |
 
 ### Communication
 
@@ -46,7 +47,9 @@ The orchestrator formalizes user requests into this JSON object:
   "columns_of_interest": ["list of other columns the user cares about"],
   "quality_requirements": "string — what quality means for this use case",
   "annotation_task": "classification",
-  "annotation_labels": ["list of label categories if known"]
+  "annotation_labels": ["list of label categories if known"],
+  "al_strategy": "entropy",
+  "al_val_split": 0.2
 }
 ```
 
@@ -65,7 +68,8 @@ DataAgent/
 │   │   ├── orchestrator.md             # Primary orchestrator agent
 │   │   ├── data-collection.md          # Stage 1 subagent
 │   │   ├── data-quality.md             # Stage 2 subagent
-│   │   └── annotation.md              # Stage 3 subagent
+│   │   ├── annotation.md              # Stage 3 subagent
+│   │   └── active-learning.md         # Stage 4 subagent
 │   └── skills/
 │       ├── data-collection/
 │       │   ├── SKILL.md                # Instructions for data collection stage
@@ -100,6 +104,12 @@ DataAgent/
 │       │   └── report.md
 │       └── annotation/
 │           ├── labels.json
+│           └── report.md
+│       └── active-learning/
+│           ├── selected_samples.csv
+│           ├── learning_curve.csv
+│           ├── model_metrics.json
+│           ├── learning_curve.png
 │           └── report.md
 └── tests/
 ```

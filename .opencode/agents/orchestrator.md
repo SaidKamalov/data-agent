@@ -37,7 +37,9 @@ You must produce a `contract.json` matching this structure:
   "columns_of_interest": ["list of other columns the user cares about"],
   "quality_requirements": "string — what quality means for this use case",
   "annotation_task": "classification",
-  "annotation_labels": ["list of label categories if known"]
+  "annotation_labels": ["list of label categories if known"],
+  "al_strategy": "entropy",
+  "al_val_split": 0.2
 }
 ```
 
@@ -65,10 +67,10 @@ Ask only what is not already clear from the user's message.
 
 ```bash
 SESSION_DIR="workspace/session-$(date -u +%Y-%m-%dT%H:%M:%S)"
-mkdir -p "$SESSION_DIR/collection/data" "$SESSION_DIR/quality/data" "$SESSION_DIR/annotation"
+mkdir -p "$SESSION_DIR/collection/data" "$SESSION_DIR/quality/data" "$SESSION_DIR/annotation" "$SESSION_DIR/active-learning"
 ```
 
-Only `collection/data/`, `quality/data/`, and `annotation/` directories are needed at start. Other files (`contract.json`, `report.md`) are written by agents as they run.
+Only `collection/data/`, `quality/data/`, `annotation/`, and `active-learning/` directories are needed at start. Other files (`contract.json`, `report.md`) are written by agents as they run.
 
 ### 4. Write contract.json
 
@@ -116,11 +118,9 @@ ls "<SESSION_DIR>/quality/report.md"
 ```
 Save the output of the first `ls` — these are the cleaned dataset file paths you will pass to the annotation agent. If no cleaned data files exist, report the issue to the user and stop.
 
-### 7. Delegate to annotation subagent (conditional)
+### 7. Delegate to annotation subagent
 
-Read `contract.json`. If `annotation_task` is `none`, skip this step entirely and go to step 8.
-
-Otherwise, list the exact cleaned data files to annotate:
+List the exact cleaned data files to annotate:
 ```bash
 # Capture the list of cleaned data files
 ls "<SESSION_DIR>/quality/data/" | grep -E '\.(csv|json|parquet|xlsx)$'
@@ -145,7 +145,33 @@ ls "<SESSION_DIR>/annotation/report.md" 2>/dev/null || ls "<SESSION_DIR>/annotat
 ```
 If no annotation output was produced, report the issue to the user.
 
-### 8. Present results
+### 8. Delegate to active-learning subagent
+
+Discover the annotation output and cleaned data:
+```bash
+ls "<SESSION_DIR>/annotation/labeled.csv"
+ls "<SESSION_DIR>/quality/data/" | grep -E '\.csv$'
+```
+
+Launch the active-learning subagent using the `task()` tool, passing the explicit file paths:
+
+```
+task(
+  description="Active learning simulation for: <contract.topic>",
+  prompt="You are the active-learning agent. Session directory: <SESSION_DIR>. Read contract.json for text_column, annotation_labels, al_strategy, al_val_split. Input files: labeled.csv from annotation (<SESSION_DIR>/annotation/labeled.csv), cleaned.csv from quality (<SESSION_DIR>/quality/data/cleaned.csv). Run active learning simulation. Output to <SESSION_DIR>/active-learning/.",
+  subagent_type="active-learning"
+)
+```
+
+Wait for the subagent to complete before proceeding.
+
+After completion, verify:
+```bash
+ls "<SESSION_DIR>/active-learning/"
+```
+If no active-learning output was produced, report the issue to the user.
+
+### 9. Present results
 
 Summarize what was done and list all artifact paths:
 
@@ -154,14 +180,19 @@ Summarize what was done and list all artifact paths:
 - Collection report: `workspace/session-.../collection/report.md`
 - Cleaned data: `workspace/session-.../quality/data/`
 - Quality report: `workspace/session-.../quality/report.md`
-- Annotations: `workspace/session-.../annotation/` (if annotation was requested)
+- Annotations: `workspace/session-.../annotation/`
 - Annotation report: `workspace/session-.../annotation/report.md`
+- Selected samples: `workspace/session-.../active-learning/selected_samples.csv`
+- Learning curve: `workspace/session-.../active-learning/learning_curve.csv`
+- Learning curve plot: `workspace/session-.../active-learning/learning_curve.png`
+- Model metrics: `workspace/session-.../active-learning/model_metrics.json`
+- AL report: `workspace/session-.../active-learning/report.md`
 
 ## Key Design Decisions
 
-- **Full pipeline**: Collection, quality, and annotation stages. Annotation is invoked only when `annotation_task` is not `none`.
+- **Full pipeline**: Collection, quality, annotation, and active-learning stages. All stages are mandatory.
 - **Subagent invocation**: Use the `task()` tool exclusively. Never use `skill()` — that loads instructions into the orchestrator's own context and makes it do the work.
 - **Session dir in prompt**: Subagents receive the session directory path and read `contract.json` from it to know what to do.
 - **Sequential execution**: Each stage must complete before the next begins, so artifacts are ready for downstream agents.
-- **Explicit file paths to annotation**: After quality completes, the orchestrator discovers cleaned files via `ls` and passes their exact paths to the annotation agent. The annotation agent should NOT have to search for files.
+- **Explicit file paths**: After each stage, the orchestrator discovers output files via `ls` and passes their exact paths to the next subagent. Subagents should NOT have to search for files.
 - **Stage verification**: After each `task()` call, verify that expected output files exist before proceeding to the next stage. Report failures to the user immediately.
