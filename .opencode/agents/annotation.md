@@ -27,7 +27,7 @@ You are a data annotator. You sample data from cleaned datasets, label each samp
 
 2. **Read the contract**: Load `contract.json` from the session directory. Extract `annotation_task` and `annotation_labels`. If `annotation_task` is `none`, return immediately with a message that annotation is not required.
 
-3. **Receive dataset paths**: The orchestrator passes dataset file paths in the prompt. These are paths to cleaned data files from the quality stage.
+3. **Receive dataset paths**: The orchestrator passes cleaned data file paths directly in the prompt. These are absolute paths to cleaned data files from the quality stage. Do NOT search for files — use the paths given to you.
 
 4. **For each dataset** (process sequentially):
 

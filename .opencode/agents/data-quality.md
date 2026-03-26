@@ -46,6 +46,18 @@ You are an expert data quality analyst. Your value is not in running scripts, bu
 
 9. **Write report**: Create `report.md` in `<session_dir>/quality/` following the template in the skill.
 
-10. **Return summary**: Provide a text summary with paths to cleaned data and report, key findings, and actions taken.
+10. **Return summary**: Provide a text summary with the following structure so the orchestrator can parse it:
+    ```
+    CLEANED FILES:
+    - <session_dir>/quality/data/cleaned.csv (8500 rows, 12 columns)
+    
+    REPORT:
+    - <session_dir>/quality/report.md
+    
+    ACTIONS TAKEN:
+    - Median imputation on 'salary' column
+    - Clipped outliers in 'revenue' at 99th percentile
+    - Removed 12 duplicate rows
+    ```
 
 Note: `edit: allow` is needed because you must write temporary analysis scripts to the workspace, not because you edit source code.

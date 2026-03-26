@@ -2,7 +2,6 @@
 description: Main orchestrator for the data pipeline — clarifies user intent, builds contract, runs stage agents
 mode: primary
 temperature: 0.1
-steps: 50
 permission:
   bash:
     "*": allow
@@ -87,6 +86,13 @@ task(
 
 Wait for the subagent to complete before proceeding.
 
+After completion, verify:
+```bash
+ls "<SESSION_DIR>/collection/data/"
+ls "<SESSION_DIR>/collection/report.md"
+```
+If no data files were downloaded, report the issue to the user and stop.
+
 ### 6. Delegate to data-quality subagent
 
 Launch the data-quality subagent using the `task()` tool.
@@ -101,21 +107,41 @@ task(
 
 Wait for the subagent to complete before proceeding.
 
+After completion, verify and discover cleaned data files:
+```bash
+ls "<SESSION_DIR>/quality/data/"
+ls "<SESSION_DIR>/quality/report.md"
+```
+Save the output of the first `ls` — these are the cleaned dataset file paths you will pass to the annotation agent. If no cleaned data files exist, report the issue to the user and stop.
+
 ### 7. Delegate to annotation subagent (conditional)
 
 Read `contract.json`. If `annotation_task` is `none`, skip this step entirely and go to step 8.
 
-Otherwise, launch the annotation subagent using the `task()` tool:
+Otherwise, list the exact cleaned data files to annotate:
+```bash
+# Capture the list of cleaned data files
+ls "<SESSION_DIR>/quality/data/" | grep -E '\.(csv|json|parquet|xlsx)$'
+```
+
+Launch the annotation subagent using the `task()` tool, passing the explicit file paths:
 
 ```
 task(
   description="Sample and annotate data for: <contract.topic>",
-  prompt="You are the annotation agent. Session directory: <SESSION_DIR>. Read contract.json for annotation_task and annotation_labels. Sample from quality/data/, label samples, export LabelStudio JSON, and write an annotation report.",
+  prompt="You are the annotation agent. Session directory: <SESSION_DIR>. Read contract.json for annotation_task and annotation_labels. Cleaned data files to annotate: <SESSION_DIR>/quality/data/file1.csv, <SESSION_DIR>/quality/data/file2.csv. For each file: sample, label, export LabelStudio JSON, write report.",
   subagent_type="annotation"
 )
 ```
 
 Wait for the subagent to complete before proceeding.
+
+After completion, verify:
+```bash
+ls "<SESSION_DIR>/annotation/"
+ls "<SESSION_DIR>/annotation/report.md" 2>/dev/null || ls "<SESSION_DIR>/annotation/*/report.md" 2>/dev/null
+```
+If no annotation output was produced, report the issue to the user.
 
 ### 8. Present results
 
@@ -135,4 +161,5 @@ Summarize what was done and list all artifact paths:
 - **Subagent invocation**: Use the `task()` tool exclusively. Never use `skill()` — that loads instructions into the orchestrator's own context and makes it do the work.
 - **Session dir in prompt**: Subagents receive the session directory path and read `contract.json` from it to know what to do.
 - **Sequential execution**: Each stage must complete before the next begins, so artifacts are ready for downstream agents.
-- **Dataset paths to annotation**: Pass the list of cleaned dataset file paths from the quality stage output directory.
+- **Explicit file paths to annotation**: After quality completes, the orchestrator discovers cleaned files via `ls` and passes their exact paths to the annotation agent. The annotation agent should NOT have to search for files.
+- **Stage verification**: After each `task()` call, verify that expected output files exist before proceeding to the next stage. Report failures to the user immediately.

@@ -81,12 +81,14 @@ task(
 )
 ```
 
+After this stage completes, the orchestrator must list files in `quality/data/` to discover the cleaned dataset paths before invoking annotation.
+
 ### annotation (only if annotation_task ≠ "none")
 
 ```
 task(
   description="Sample and annotate data",
-  prompt="Session directory: workspace/session-YYYY-MM-DDTHH:MM:SS/. Read contract.json for annotation_task and annotation_labels. Sample from quality/data/, label samples, export LabelStudio JSON, and write an annotation report.",
+  prompt="Session directory: workspace/session-YYYY-MM-DDTHH:MM:SS/. Read contract.json for annotation_task and annotation_labels. Cleaned data files to annotate: workspace/session-.../quality/data/cleaned.csv. For each file: sample, label, export LabelStudio JSON, write report.",
   subagent_type="annotation"
 )
 ```
@@ -95,5 +97,7 @@ task(
 1. Clarify user intent
 2. Create session workspace
 3. Write contract.json
-4. Delegate each stage to its subagent via `task()`
-5. Present final results
+4. Discover cleaned data files after quality stage (via `ls`)
+5. Delegate each stage to its subagent via `task()`, passing explicit file paths
+6. Verify each stage produced expected output before proceeding
+7. Present final results
