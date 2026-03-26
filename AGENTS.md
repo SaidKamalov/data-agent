@@ -57,10 +57,43 @@ The orchestrator writes a `contract.json` in the session directory:
 
 ## Invoking Subagents
 
-Use `@` mentions in prompts to invoke stage agents:
+Subagents are invoked via the `task()` tool, NOT the `skill()` tool. The `skill()` tool loads instructions into the current agent's context (self-execution). The `task()` tool spawns an independent agent session.
 
-- `@data-collection` — Search and download datasets
-- `@data-quality` — Profile and clean data
-- `@annotation` — Sample data and produce LabelStudio-compatible labeled output
+Each pipeline stage must be delegated to its corresponding subagent:
 
-Pass the session directory path in the prompt so the subagent knows where to find the contract and write artifacts.
+### data-collection
+
+```
+task(
+  description="Search and download datasets",
+  prompt="Session directory: workspace/session-YYYY-MM-DDTHH:MM:SS/. Read contract.json from there. Search for datasets matching the contract requirements using the available search scripts. Present options to the user, download the selected dataset, and write a collection report.",
+  subagent_type="data-collection"
+)
+```
+
+### data-quality
+
+```
+task(
+  description="Profile and clean collected data",
+  prompt="Session directory: workspace/session-YYYY-MM-DDTHH:MM:SS/. Read contract.json and profile the data in collection/data/. Detect quality issues, consult the user on cleaning strategies, apply cleaning, and write a quality report.",
+  subagent_type="data-quality"
+)
+```
+
+### annotation (only if annotation_task ≠ "none")
+
+```
+task(
+  description="Sample and annotate data",
+  prompt="Session directory: workspace/session-YYYY-MM-DDTHH:MM:SS/. Read contract.json for annotation_task and annotation_labels. Sample from quality/data/, label samples, export LabelStudio JSON, and write an annotation report.",
+  subagent_type="annotation"
+)
+```
+
+**The orchestrator must NEVER load skills or execute stage work directly.** Its only jobs are:
+1. Clarify user intent
+2. Create session workspace
+3. Write contract.json
+4. Delegate each stage to its subagent via `task()`
+5. Present final results
