@@ -4,6 +4,8 @@ An agent-based pipeline for text classification — from data collection through
 
 Point opencode at your text classification task, and the pipeline finds datasets, cleans data, labels samples with LLM reasoning, and runs active learning to improve your classifier with fewer labeled examples.
 
+**Link for the demo video:** https://disk.yandex.ru/d/wMNSfk3z3B_j5w
+
 ## Quick Start
 
 ```bash
